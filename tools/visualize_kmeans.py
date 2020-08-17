@@ -47,14 +47,15 @@ def parse_annotation(annotation_path, target_size=None):
 
             # use letterbox resize, i.e. keep the original aspect ratio
             # get k-means anchors on the resized target image size
-            if target_size is not None:
-                resize_ratio = min(target_size[0] / img_w, target_size[1] / img_h)
-                width *= resize_ratio
-                height *= resize_ratio
-                boxes.append([width, height])
+            # if target_size is not None:
+            #     resize_ratio = min(target_size[0] / img_w, target_size[1] / img_h)
+            #     width *= resize_ratio
+            #     height *= resize_ratio
+            width= width / img_w  # make the width range between [0,GRID_W)
+            height = height / img_h  # make the width range between [0,GRID_H)
+            boxes.append([width, height])
             # get k-means anchors on the original image size
-            else:
-                boxes.append([width, height])
+            boxes.append([width, height])
         num_samples += 1
 
     boxes = np.asarray(boxes)
@@ -85,6 +86,7 @@ def visualize_cluster(boxes):
 
 
 def visualize_kmeans(clusters, nearest_clusters, boxes, k):
+
     current_palette = list(sns.xkcd_rgb.values())
     for cluster_index in np.unique(nearest_clusters):
         index = np.equal(nearest_clusters, cluster_index)
@@ -93,10 +95,11 @@ def visualize_kmeans(clusters, nearest_clusters, boxes, k):
         plt.plot(boxes[index][:, 0], boxes[index][:, 1], "p",
                  color= current_palette[cluster_index],
                  alpha=0.5, label="cluster = {}, N = {:6.0f}".format(cluster_index, np.sum(cluster_index)))
+        plt.scatter(clusters[cluster_index][0], clusters[cluster_index][1], marker='^', s=30, color='black')
         plt.text(clusters[cluster_index][0],
                  clusters[cluster_index][1],
                  "c{}".format(cluster_index),
-                 fontsize=20, color="red")
+                 fontsize=15, color="red")
         plt.title("Clusters={0}".format(k))
         plt.xlabel("width")
         plt.ylabel("height")
@@ -159,19 +162,29 @@ def kmeans(boxes, k, dist=np.median):
     # the Forgy method will fail if the whole array contains the same rows
     clusters = boxes[np.random.choice(rows, k, replace=False)]
 
-    while True:
-        for row in range(rows):
-            distances[row] = 1 - iou(boxes[row], clusters)
+    # while True:
+    #     for row in range(rows):
+    #         distances[row] = 1 - iou(boxes[row], clusters)
+    #
+    #     nearest_clusters = np.argmin(distances, axis=1)
+    #
+    #     if (last_clusters == nearest_clusters).all():
+    #         break
+    #
+    #     for cluster in range(k):
+    #         clusters[cluster] = dist(boxes[nearest_clusters == cluster], axis=0)
+    #
+    #     last_clusters = nearest_clusters
 
-        nearest_clusters = np.argmin(distances, axis=1)
+    for row in range(rows):
+        distances[row] = 1 - iou(boxes[row], clusters)
 
-        if (last_clusters == nearest_clusters).all():
-            break
+    nearest_clusters = np.argmin(distances, axis=1)
 
-        for cluster in range(k):
-            clusters[cluster] = dist(boxes[nearest_clusters == cluster], axis=0)
+    for cluster in range(k):
+        clusters[cluster] = dist(boxes[nearest_clusters == cluster], axis=0)
 
-        last_clusters = nearest_clusters
+    last_clusters = nearest_clusters
 
     return clusters, nearest_clusters
 
@@ -181,7 +194,7 @@ def get_kmeans(annotation, cluster_num=9):
     anchors, nearest_clusters = kmeans(annotation, cluster_num)
     ave_iou = avg_iou(annotation, anchors)
 
-    anchors = anchors.astype('int').tolist()
+    anchors = anchors.tolist()
 
     anchors = sorted(anchors, key=lambda x: x[0] * x[1])
 
