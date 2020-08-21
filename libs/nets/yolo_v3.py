@@ -123,7 +123,6 @@ class YOLOV3(object):
         xy_grid = tf.tile(xy_grid[tf.newaxis, :, :, tf.newaxis, :], [batch_size, 1, 1, anchor_per_scale, 1]) # (batch_size, output_size, output_size, 3, 2)
         xy_grid = tf.cast(xy_grid, tf.float32)
 
-
         pred_xy = (tf.sigmoid(conv_raw_dxdy) + xy_grid) * stride
         pred_wh = (tf.exp(conv_raw_dwdh) * anchors) * stride
         pred_xywh = tf.concat([pred_xy, pred_wh], axis=-1)
@@ -138,26 +137,38 @@ class YOLOV3(object):
         return focal_loss
 
     def bbox_giou(self, boxes1, boxes2):
+        """
 
+        :param boxes1: # [batch_size, output_size, output_size, anchor_per_scale, 4]
+        :param boxes2: # [batch_size, output_size, output_size, anchor_per_scale, 4]
+        :return:
+        """
+        # (x, y, w, h) => (x_min, y_min, x_max, y_max)
         boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5,
                             boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
         boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5,
                             boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
 
+        # ensure x_min < x_max, y_min < y_max
         boxes1 = tf.concat([tf.minimum(boxes1[..., :2], boxes1[..., 2:]),
                             tf.maximum(boxes1[..., :2], boxes1[..., 2:])], axis=-1)
         boxes2 = tf.concat([tf.minimum(boxes2[..., :2], boxes2[..., 2:]),
                             tf.maximum(boxes2[..., :2], boxes2[..., 2:])], axis=-1)
 
+        # get boxes area
         boxes1_area = (boxes1[..., 2] - boxes1[..., 0]) * (boxes1[..., 3] - boxes1[..., 1])
         boxes2_area = (boxes2[..., 2] - boxes2[..., 0]) * (boxes2[..., 3] - boxes2[..., 1])
 
+        # get inter area of two boxes (x_min, y_min), (x_max, y_max)
         left_up = tf.maximum(boxes1[..., :2], boxes2[..., :2])
         right_down = tf.minimum(boxes1[..., 2:], boxes2[..., 2:])
-
+        # (x_min, y_min), (x_max, y_max) => (w, h)
         inter_section = tf.maximum(right_down - left_up, 0.0)
+        # get inter area value
         inter_area = inter_section[..., 0] * inter_section[..., 1]
+        # get union area value
         union_area = boxes1_area + boxes2_area - inter_area
+        # get iou
         iou = inter_area / union_area
 
         enclose_left_up = tf.minimum(boxes1[..., :2], boxes2[..., :2])
@@ -169,53 +180,79 @@ class YOLOV3(object):
         return giou
 
     def bbox_iou(self, boxes1, boxes2):
+        """
 
-        boxes1_area = boxes1[..., 2] * boxes1[..., 3]
-        boxes2_area = boxes2[..., 2] * boxes2[..., 3]
+        :param boxes1: [batch_size, target_seize, target_size, 3, 1,   4]
+        :param boxes2: [batch_size, 1,            1,           1, 150, 4]
+        :return:
+        """
 
+        # get boxes1 area
+        boxes1_area = boxes1[..., 2] * boxes1[..., 3]  # [batch_size, target_seize, target_size, 3, 1]
+        boxes2_area = boxes2[..., 2] * boxes2[..., 3]  # [batch_size, 1,            1,           1, 150]
+
+        # (x, y, w, h) => (x_min, y_min, x_max, y_max)
         boxes1 = tf.concat([boxes1[..., :2] - boxes1[..., 2:] * 0.5,
-                            boxes1[..., :2] + boxes1[..., 2:] * 0.5], axis=-1)
+                            boxes1[..., :2] + boxes1[..., 2:] * 0.5],
+                           axis=-1)  # [batch_size, target_seize, target_size, 3, 1,   4]
         boxes2 = tf.concat([boxes2[..., :2] - boxes2[..., 2:] * 0.5,
-                            boxes2[..., :2] + boxes2[..., 2:] * 0.5], axis=-1)
+                            boxes2[..., :2] + boxes2[..., 2:] * 0.5],
+                           axis=-1)  # [batch_size, 1,            1,           1, 150, 4]
 
-        left_up = tf.maximum(boxes1[..., :2], boxes2[..., :2])
-        right_down = tf.minimum(boxes1[..., 2:], boxes2[..., 2:])
-
+        # get inter bbox
+        left_up = tf.maximum(boxes1[..., :2], boxes2[..., :2])  # [batch_size, target_seize, target_size, 3, 150,  2]
+        right_down = tf.minimum(boxes1[..., 2:],
+                                boxes2[..., 2:])  # # [batch_size, target_seize, target_size, 3, 150,  2]
         inter_section = tf.maximum(right_down - left_up, 0.0)
+
         inter_area = inter_section[..., 0] * inter_section[..., 1]
         union_area = boxes1_area + boxes2_area - inter_area
-        iou = 1.0 * inter_area / union_area
+        iou = 1.0 * inter_area / union_area  # [batch_size, target_seize, target_size, 3, 150]
 
         return iou
 
+
     def loss_layer(self, conv, pred, label, bboxes, anchors, stride):
+        """
+        :param conv: [batch_size, output_size, output_size, anchor_per_scale*(4+1+NUM_CLASSES)]
+        :param pred: [batch_size, output_size, output_size, anchor_per_scale，(4+1+NUM_CLASSES)]
+        :param label: [batch_size, output_size, output_size, anchor_per_scale，(4+1+NUM_CLASSES)]
+        :param bboxes: [batch_size, max_box_per_scale, 4] = [batch_size, 150, 4]
+        :param anchors: [anchor_per_scale, 2] = [3,2]
+        :param stride: [, 3] = [8, 16, 32]
+        :return:
+        """
 
         conv_shape  = tf.shape(conv)
         batch_size  = conv_shape[0]
         output_size = conv_shape[1]
         input_size  = stride * output_size
+        # [batch_size, output_size, output_size, anchor_per_scale, 4+1+NUM_CLASSES]
         conv = tf.reshape(conv, (batch_size, output_size, output_size,
                                  self.anchor_per_scale, 5 + self.num_class))
-        conv_raw_conf = conv[:, :, :, :, 4:5]
-        conv_raw_prob = conv[:, :, :, :, 5:]
+        conv_raw_conf = conv[:, :, :, :, 4:5] # [batch_size, output_size, output_size, anchor_per_scale, 1]
+        conv_raw_prob = conv[:, :, :, :, 5:]  # [batch_size, output_size, output_size, anchor_per_scale, NUM_CLASSES]
 
-        pred_xywh     = pred[:, :, :, :, 0:4]
-        pred_conf     = pred[:, :, :, :, 4:5]
+        pred_xywh     = pred[:, :, :, :, 0:4] # [batch_size, output_size, output_size, anchor_per_scale, 4]
+        pred_conf     = pred[:, :, :, :, 4:5] # [batch_size, output_size, output_size, anchor_per_scale, 1]
 
-        label_xywh    = label[:, :, :, :, 0:4]
-        respond_bbox  = label[:, :, :, :, 4:5]
-        label_prob    = label[:, :, :, :, 5:]
+        label_xywh    = label[:, :, :, :, 0:4] # [batch_size, output_size, output_size, anchor_per_scale, 4]
+        respond_bbox  = label[:, :, :, :, 4:5] # [batch_size, output_size, output_size, anchor_per_scale, 1]
+        label_prob    = label[:, :, :, :, 5:] # [batch_size, output_size, output_size, anchor_per_scale, NUM_CLASS]
 
+        # -------------------compute bbox loss-------------------------------------
         giou = tf.expand_dims(self.bbox_giou(pred_xywh, label_xywh), axis=-1)
         input_size = tf.cast(input_size, tf.float32)
 
         bbox_loss_scale = 2.0 - 1.0 * label_xywh[:, :, :, :, 2:3] * label_xywh[:, :, :, :, 3:4] / (input_size ** 2)
         giou_loss = respond_bbox * bbox_loss_scale * (1- giou)
 
+        # --------------------compute conf loss-----------------------------------
         iou = self.bbox_iou(pred_xywh[:, :, :, :, np.newaxis, :], bboxes[:, np.newaxis, np.newaxis, np.newaxis, :, :])
-        max_iou = tf.expand_dims(tf.reduce_max(iou, axis=-1), axis=-1)
+        max_iou = tf.expand_dims(tf.reduce_max(iou, axis=-1), axis=-1)  # [batch_size, target_seize, target_size, 3, 1]
 
-        respond_bgd = (1.0 - respond_bbox) * tf.cast( max_iou < self.iou_loss_thresh, tf.float32 )
+        # get back ground mask
+        respond_bgd = (1.0 - respond_bbox) * tf.cast(max_iou < self.iou_loss_thresh, tf.float32)
 
         conf_focal = self.focal(respond_bbox, pred_conf)
 
@@ -224,12 +261,12 @@ class YOLOV3(object):
                 +
                 respond_bgd * tf.nn.sigmoid_cross_entropy_with_logits(labels=respond_bbox, logits=conv_raw_conf)
         )
-
+        #-----------------------cmpute class loss-------------------------------------------------
         prob_loss = respond_bbox * tf.nn.sigmoid_cross_entropy_with_logits(labels=label_prob, logits=conv_raw_prob)
 
-        giou_loss = tf.reduce_mean(tf.reduce_sum(giou_loss, axis=[1,2,3,4]))
-        conf_loss = tf.reduce_mean(tf.reduce_sum(conf_loss, axis=[1,2,3,4]))
-        prob_loss = tf.reduce_mean(tf.reduce_sum(prob_loss, axis=[1,2,3,4]))
+        giou_loss = tf.reduce_mean(tf.reduce_sum(giou_loss, axis=[1,2,3,4])) # (1,)
+        conf_loss = tf.reduce_mean(tf.reduce_sum(conf_loss, axis=[1,2,3,4])) # (1,)
+        prob_loss = tf.reduce_mean(tf.reduce_sum(prob_loss, axis=[1,2,3,4])) # (1,)
 
         return giou_loss, conf_loss, prob_loss
 
@@ -257,5 +294,5 @@ class YOLOV3(object):
         with tf.name_scope('prob_loss'):
             prob_loss = loss_sbbox[2] + loss_mbbox[2] + loss_lbbox[2]
 
-        return giou_loss, conf_loss, prob_loss
+        return giou_loss, conf_loss, prob_loss  # (1,), (1,), (1,)
 
