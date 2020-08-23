@@ -29,7 +29,8 @@ def image_resize_padding(image, target_size, gt_boxes=None):
     image_paded = np.full(shape=[ih, iw, 3], fill_value=128.0)
     dw, dh = (iw - nw) // 2, (ih-nh) // 2
     image_paded[dh:nh+dh, dw:nw+dw, :] = image_resized
-    image_paded = image_paded / 255.
+    # convert pixel scale to (0, 1)
+    image_paded = tf.image.convert_image_dtype(image_paded, dtype=tf.float32)
 
     if gt_boxes is None:
         return image_paded
