@@ -10,6 +10,7 @@
 # @ Software   : PyCharm
 #-------------------------------------------------------
 
+import os
 import numpy as np
 import tensorflow as tf
 from utils import tools
@@ -23,8 +24,9 @@ class YOLOV3(object):
     def __init__(self, input_data, trainable):
 
         self.trainable        = trainable
-
-        self.num_class        = cfgs.CLASS_NUM
+        self.classes = tools.read_class_names(cfgs.CLASS_NAME)
+        self.num_class = len(self.classes)
+        self.num_class        = len(self.classes)
         self.strides          = np.array(cfgs.STRIDES)
         self.anchors          = tools.get_anchors(cfgs.ANCHORS)
         self.anchor_per_scale = cfgs.ANCHOR_PER_SCALE
@@ -32,7 +34,8 @@ class YOLOV3(object):
         self.upsample_method  = cfgs.UPSAMPLE_METHOD
 
         try:
-            self.conv_lbbox, self.conv_mbbox, self.conv_sbbox = self.__build_nework(input_data)
+            with tf.variable_scope(cfgs.MODEL_NAME, default_name="yolo_v3"):
+                self.conv_lbbox, self.conv_mbbox, self.conv_sbbox = self.__build_nework(input_data)
         except:
             raise NotImplementedError("Can not build up yolov3 network!")
 
@@ -298,4 +301,41 @@ class YOLOV3(object):
             prob_loss = loss_sbbox[2] + loss_mbbox[2] + loss_lbbox[2]
 
         return giou_loss, conf_loss, prob_loss  # (1,), (1,), (1,)
+
+
+    def get_restorer(self):
+        """
+        restore pretrain weight
+        :return:
+        """
+
+        checkpoint_path = tf.train.latest_checkpoint(os.path.join(cfgs.TRAINED_CKPT, cfgs.VERSION))
+
+        if checkpoint_path != None:
+
+            # model_variables = tf.model_variables()
+            restorer = tf.train.Saver()
+            print("model restore from {0}".format(checkpoint_path))
+
+        else:
+            checkpoint_path = cfgs.PRETRAINED_WEIGHTS
+            custom_scope = ['conv_sbbox', 'conv_mbbox', 'conv_lbbox']
+            model_variables = tf.global_variables()
+            ckpt_var_dict = {}
+            for var in model_variables:
+                if var.name.split('/')[1] in custom_scope:
+                    continue
+                else:
+                    var_name_ckpt = var.op.name
+                    ckpt_var_dict[var_name_ckpt] = var
+            restore_variables = ckpt_var_dict
+            for key, item in restore_variables.items():
+                print("var_in_graph: ", item.name)
+                print("var_in_ckpt: ", key)
+
+            restorer = tf.compat.v1.train.Saver(restore_variables)
+
+            print("restore from pretrained_weighs by COCO")
+
+        return restorer, checkpoint_path
 
