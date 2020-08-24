@@ -24,8 +24,8 @@ class YOLOV3(object):
     def __init__(self, input_data, trainable):
 
         self.trainable        = trainable
-        self.classes = tools.read_class_names(cfgs.CLASS_NAME)
-        self.num_class = len(self.classes)
+        self.classes          = tools.read_class_names(cfgs.CLASS_NAME)
+        self.num_class        = len(self.classes)
         self.num_class        = len(self.classes)
         self.strides          = np.array(cfgs.STRIDES)
         self.anchors          = tools.get_anchors(cfgs.ANCHORS)
@@ -303,7 +303,7 @@ class YOLOV3(object):
         return giou_loss, conf_loss, prob_loss  # (1,), (1,), (1,)
 
 
-    def get_restorer(self):
+    def get_restorer(self, is_training=False):
         """
         restore pretrain weight
         :return:
@@ -316,10 +316,12 @@ class YOLOV3(object):
             # model_variables = tf.model_variables()
             restorer = tf.train.Saver()
             print("model restore from {0}".format(checkpoint_path))
-
         else:
             checkpoint_path = cfgs.PRETRAINED_WEIGHTS
-            custom_scope = ['conv_sbbox', 'conv_mbbox', 'conv_lbbox']
+            if is_training:
+                custom_scope = ['conv_sbbox', 'conv_mbbox', 'conv_lbbox']
+            else:
+                custom_scope = []
             model_variables = tf.global_variables()
             ckpt_var_dict = {}
             for var in model_variables:
