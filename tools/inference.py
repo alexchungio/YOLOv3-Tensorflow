@@ -26,9 +26,11 @@ from utils.tools import makedir, view_bar
 
 
 class ObjectInference():
-    def __init__(self, input_size=(416, 416), ckpt_path=None):
+    def __init__(self, input_size=(416, 416), ckpt_path=None, score_threshold=0.3, num_threshold=0.45):
         self.input_size    = input_size
         self.ckpt_path    = ckpt_path
+        self.score_threshold = score_threshold
+        self.num_threshold = num_threshold
         self.class_name   = read_class_names(cfgs.CLASS_NAME)
         self.num_classes  = len(self.class_name)
         self.input_data = tf.placeholder(dtype=tf.float32, name='input_data')
@@ -99,8 +101,8 @@ class ObjectInference():
                                             np.reshape(pred_mbbox, (-1, 5 + self.num_classes)),
                                             np.reshape(pred_lbbox, (-1, 5 + self.num_classes))], axis=0)
 
-                bboxes = box_utils.postprocess_boxes(pred_bbox, original_size, self.input_size[0], 0.3)
-                bboxes = box_utils.nms(bboxes, 0.45, method='nms')
+                bboxes = box_utils.postprocess_boxes(pred_bbox, original_size, self.input_size[0], self.score_threshold)
+                bboxes = box_utils.nms(bboxes, self.num_threshold, method='nms')
                 end_time = time.perf_counter()
 
                 image = draw_box_in_image.draw_bbox(original_image, bboxes, classes=self.class_name)
