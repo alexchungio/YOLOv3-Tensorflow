@@ -33,7 +33,7 @@ class YoloTest(object):
         self.iou_threshold    = cfgs.TEST_IOU_THRESHOLD
         self.moving_ave_decay = cfgs.MOVING_AVE_DECAY
         self.annotation_path  = cfgs.TEST_ANNOT_PATH
-        self.weight_file      = os.path.join(cfgs.TRAINED_CKPT, cfgs.VERSION, "yolov3_loss=19.0317.ckpt")
+        self.weight_file      = os.path.join(cfgs.TRAINED_CKPT, cfgs.VERSION, "yolov3_loss=11.0706.ckpt-6")
         self.write_image      = cfgs.TEST_WRITE_IMAGE
         self.write_image_path = cfgs.TEST_SAVE_IMAGE_PATH
         self.show_label       = cfgs.TEST_SHOW_LABEL
@@ -84,17 +84,17 @@ class YoloTest(object):
         if os.path.exists(predicted_dir_path): shutil.rmtree(predicted_dir_path)
         if os.path.exists(ground_truth_dir_path): shutil.rmtree(ground_truth_dir_path)
         if os.path.exists(self.write_image_path): shutil.rmtree(self.write_image_path)
-        os.mkdir(predicted_dir_path)
-        os.mkdir(ground_truth_dir_path)
-        os.mkdir(self.write_image_path)
+        tools.makedir(predicted_dir_path)
+        tools.makedir(ground_truth_dir_path)
+        tools.makedir(self.write_image_path)
 
         with open(self.annotation_path, 'r') as annotation_file:
             for num, line in enumerate(annotation_file):
                 annotation = line.strip().split()
-                image_path = annotation[0]
+                image_path = annotation[1]
                 image_name = image_path.split('/')[-1]
                 image = cv2.imread(image_path)
-                bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
+                bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[4:]])
 
                 if len(bbox_data_gt) == 0:
                     bboxes_gt=[]
@@ -117,8 +117,8 @@ class YoloTest(object):
                 bboxes_pr = self.predict(image)
 
                 if self.write_image:
-                    image = draw_box_in_image.draw_bbox(image, bboxes_pr, show_label=self.show_label)
-                    cv2.imwrite(self.write_image_path+image_name, image)
+                    image = draw_box_in_image.draw_bbox(image, bboxes_pr, classes=self.classes, show_label=self.show_label)
+                    cv2.imwrite(os.path.join(self.write_image_path, image_name), image)
 
                 with open(predict_result_path, 'w') as f:
                     for bbox in bboxes_pr:
