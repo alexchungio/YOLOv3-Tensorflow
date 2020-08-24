@@ -139,7 +139,7 @@ if __name__ == '__main__':
     # if target_resize is speficied, the anchors are on the resized image scale
     # if target_resize is set to None, the anchors are on the original image scale
 
-    anno_result = parse_anno(cfgs.TRAIN_ANNOTATION, target_size=cfgs.IMAGE_SHPAE)
+    anno_result = parse_anno(cfgs.TRAIN_ANNOT_PATH, target_size=cfgs.IMAGE_SHPAE)
     anchors, ave_iou = get_kmeans(anno_result, 9)
 
     anchor_string = ''

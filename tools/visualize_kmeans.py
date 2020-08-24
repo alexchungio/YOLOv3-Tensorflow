@@ -202,7 +202,7 @@ def get_kmeans(annotation, cluster_num=9):
 
 if __name__ == "__main__":
 
-    train_boxes, train_labels, num_samples = parse_annotation(cfgs.TRAIN_ANNOTATION)
+    train_boxes, train_labels, num_samples = parse_annotation(cfgs.TRAIN_ANNOT_PATH)
     print("N train = {}".format(len(train_boxes)))
 
     visualize_class(train_boxes, train_labels, num_samples, LABELS)
