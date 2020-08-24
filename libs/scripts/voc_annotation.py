@@ -27,13 +27,16 @@ def convert_voc_annotation(data_path, data_type, anno_path, use_difficult_bbox=T
         image_inds = [line.strip() for line in txt]
 
     with open(anno_path, 'a') as f:
+        index = 0
         for image_ind in image_inds:
-            image_path = os.path.join(data_path, 'JPEGImages', image_ind + '.jpg')
-            annotation = image_path
+            image_path = os.path.join(data_path, 'JPEGImages', image_ind + 'car.jpg')
+            annotation = ''
             label_path = os.path.join(data_path, 'Annotations', image_ind + '.xml')
             root = ET.parse(label_path).getroot()
-            objects = root.findall('object')
-            for obj in objects:
+            height = root.findtext("./size/height")
+            width = root.findtext("./size/width")
+            annotation += ' '.join([str(index), image_path, width, height])
+            for obj in root.findall('object'):
                 difficult = obj.find('difficult').text.strip()
                 if (not use_difficult_bbox) and(int(difficult) == 1):
                     continue
@@ -46,6 +49,7 @@ def convert_voc_annotation(data_path, data_type, anno_path, use_difficult_bbox=T
                 annotation += ' ' + ','.join([xmin, ymin, xmax, ymax, str(class_ind)])
             print(annotation)
             f.write(annotation + "\n")
+            index += 1
     return len(image_inds)
 
 
@@ -53,11 +57,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", default=cfgs.DATASET_DIR)
-    parser.add_argument("--train_annotation", default=os.path.join(cfgs.ANNOTATION_DIR, "voc_train.txt"))
-    parser.add_argument("--test_annotation",  default=os.path.join(cfgs.ANNOTATION_DIR, "voc_test.txt"))
+    parser.add_argument("--train_annotation", default=cfgs.TRAIN_ANNOT_PATH)
+    parser.add_argument("--test_annotation",  default=cfgs.TEST_ANNOT_PATH)
     flags = parser.parse_args()
 
-    makedir(os.path.dirname(flags.train_annotation))
     makedir(os.path.dirname(flags.train_annotation))
 
     if os.path.exists(flags.train_annotation):os.remove(flags.train_annotation)
@@ -66,8 +69,6 @@ if __name__ == '__main__':
     train_path_1 = os.path.join(flags.data_path, 'train', 'VOC2007')
     train_path_2 = os.path.join(flags.data_path, 'train', 'VOC2012')
     test_path_1 = os.path.join(flags.data_path, 'test', 'VOC2007')
-
-
 
     num1 = convert_voc_annotation(train_path_1, 'trainval', flags.train_annotation, False)
     num2 = convert_voc_annotation(train_path_2, 'trainval', flags.train_annotation, False)
