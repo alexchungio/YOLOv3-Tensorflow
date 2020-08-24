@@ -30,8 +30,7 @@ def image_resize_padding(image, target_size, gt_boxes=None):
     dw, dh = (iw - nw) // 2, (ih-nh) // 2
     image_paded[dh:nh+dh, dw:nw+dw, :] = image_resized
     # convert pixel scale to (0, 1)
-    image_paded = tf.image.convert_image_dtype(image_paded, dtype=tf.float32)
-
+    image_paded = image_paded / 255.
     if gt_boxes is None:
         return image_paded
 
@@ -53,7 +52,6 @@ def image_resize_padding_tensor(image, target_size, gt_boxes=None):
 
     image_resized = tf.image.resize(image, (nw, nh))
 
-    # image_paded = tf.constant(value=128.0, shape=[ih, iw, 3], dtype=tf.float32)
     dw = iw - nw
     dh = ih - nh
     dw_left = int(np.floor(dw / 2))
@@ -67,16 +65,16 @@ def image_resize_padding_tensor(image, target_size, gt_boxes=None):
     if gt_boxes is None:
         return image_paded
     else:
-        x_min, y_min, x_max, y_max = tf.unstack(gt_boxes, axis=1)
+        x_min, y_min, x_max, y_max, labels = tf.unstack(gt_boxes, axis=1)
         x_min, x_max = x_min * scale + dw_left, x_max * scale + dw_left
         y_min, y_max = y_min * scale + dw_left, y_max * scale + dw_left
-        gt_boxes = tf.transpose(tf.stack([x_min, y_min, x_max, y_max], axis=0))
+        gt_boxes = tf.transpose(tf.stack([x_min, y_min, x_max, y_max, labels], axis=0))
         return image_paded, gt_boxes
 
 
 if __name__ == "__main__":
     image_tensor = tf.constant(shape=(576, 448, 3), value=128.0, dtype=tf.float32)
-    gt_boxes = tf.constant([[112.0, 158.0, 276.0, 360.0], [180.0, 330, 398, 412]], dtype=tf.float32)
+    gt_boxes = tf.constant([[112.0, 158.0, 276.0, 360.0, 3], [180.0, 330, 398, 412, 6]], dtype=tf.float32)
     target_image, target_gt_boxes = image_resize_padding_tensor(image_tensor, target_size=(416, 416), gt_boxes=gt_boxes)
     print(target_image)
     print(target_gt_boxes)

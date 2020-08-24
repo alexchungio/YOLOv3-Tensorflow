@@ -152,12 +152,11 @@ class Dataset(object):
     def parse_annotation(self, annotation):
 
         line = annotation.split()
-        image_path = line[0]
+        image_path = line[1]
         if not os.path.exists(image_path):
             raise KeyError("%s does not exist ... " %image_path)
         image = np.array(cv2.imread(image_path))
-        bboxes = np.array([list(map(lambda x: int(float(x)), box.split(','))) for box in line[1:]])
-
+        bboxes = np.array([list(map(lambda x: int(float(x)), box.split(','))) for box in line[4:]])
         if self.is_training:
             image, bboxes = self.random_horizontal_flip(np.copy(image), np.copy(bboxes))
             image, bboxes = self.random_crop(np.copy(image), np.copy(bboxes))
