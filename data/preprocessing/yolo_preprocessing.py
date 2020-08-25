@@ -15,9 +15,10 @@ import tensorflow as tf
 import numpy as np
 
 
-def image_resize_padding(image, target_size, gt_boxes=None):
+def image_resize_padding(image, target_size, gt_boxes=None, is_rgb=False):
 
-    image = cv.cvtColor(image, cv.COLOR_BGR2RGB).astype(np.float32)
+    if is_rgb is False:
+        image = cv.cvtColor(image, cv.COLOR_BGR2RGB).astype(np.float32)
 
     ih, iw    = target_size
     h,  w, _  = image.shape
