@@ -30,7 +30,7 @@ class Dataset(object):
 
         self.train_input_sizes = cfgs.TRAIN_INPUT_SIZE
         self.strides = np.array(cfgs.STRIDES)
-        self.classes = tools.read_class_names(cfgs.CLASS_NAME)
+        self.classes = tools.read_class_names(cfgs.CLASSES)
         self.num_classes = len(self.classes)
         self.anchors = np.array(tools.get_anchors(cfgs.ANCHORS))
         self.anchor_per_scale = cfgs.ANCHOR_PER_SCALE
@@ -46,6 +46,7 @@ class Dataset(object):
             txt = f.readlines()
             annotations = [line.strip() for line in txt if len(line.strip().split()[1:]) != 0]
         np.random.shuffle(annotations)
+
         return annotations
 
     def __iter__(self):
@@ -54,7 +55,8 @@ class Dataset(object):
     def __next__(self):
 
         with tf.device('/cpu:0'):
-            self.train_input_size = random.choice(self.train_input_sizes)
+            # self.train_input_size = random.choice(self.train_input_sizes)
+            self.train_input_size = 416
             self.train_output_sizes = self.train_input_size // self.strides
 
             batch_image = np.zeros((self.batch_size, self.train_input_size, self.train_input_size, 3))
@@ -270,6 +272,15 @@ class Dataset(object):
 
     def __len__(self):
         return self.num_batchs
+
+
+if __name__ == "__main__":
+
+    dataset = Dataset(is_training=True)
+
+    for data in dataset:
+        print(data[0].shape, data[1].shape, data[2].shape, data[3].shape, data[4].shape, data[5].shape, data[6].shape)
+        print(data[0])
 
 
 
