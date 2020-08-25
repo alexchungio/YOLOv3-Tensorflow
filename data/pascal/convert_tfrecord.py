@@ -41,7 +41,7 @@ tf.app.flags.DEFINE_string('dataset_dir', original_dataset_dir, 'Voc dir')
 tf.app.flags.DEFINE_string('xml_dir', 'Annotations', 'xml dir')
 tf.app.flags.DEFINE_string('image_dir', 'JPEGImages', 'image dir')
 tf.app.flags.DEFINE_string('save_name', 'train', 'save name')
-tf.app.flags.DEFINE_string('year', '2007', 'Desired challenge year.')
+tf.app.flags.DEFINE_string('year', '2007,2012', 'Desired challenge year.')
 tf.app.flags.DEFINE_string('output_dir', tfrecord_dir, 'save name')
 tf.app.flags.DEFINE_string('img_format', 'jpg', 'format of image')
 tf.app.flags.DEFINE_boolean('ignore_difficult_instances', False, 'Whether to ignore '
@@ -175,10 +175,10 @@ def process_image(img_path, xml_path, class_name=None):
             truncated.append(0)
 
         bbox = obj.find('bndbox')
-        bboxes.append((float(bbox.find('xmin').text) / shape[1],
-                       float(bbox.find('ymin').text) / shape[0],
-                       float(bbox.find('xmax').text) / shape[1],
-                       float(bbox.find('ymax').text) / shape[0]
+        bboxes.append((float(bbox.find('xmin').text),
+                       float(bbox.find('ymin').text),
+                       float(bbox.find('xmax').text),
+                       float(bbox.find('ymax').text)
                        ))
     return encoded_img, shape, bboxes, labels, labels_text, difficult, truncated
 

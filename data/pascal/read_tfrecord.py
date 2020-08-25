@@ -139,7 +139,7 @@ class Dataset(object):
         lbboxes = tf.reshape(lbboxes, shape=(self.max_bbox_per_scale, 4))
 
 
-        return  tf.train.batch([image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes],
+        return  tf.train.batch([image, filename, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes],
                                  dynamic_pad=False,
                                  batch_size=batch_size,
                                  allow_smaller_final_batch=(not is_training),
@@ -208,7 +208,7 @@ class Dataset(object):
             image, bboxes = self.random_crop(np.copy(image), np.copy(bboxes))
             image, bboxes = self.random_translate(np.copy(image), np.copy(bboxes))
 
-        image, bboxes = image_resize_padding(np.copy(image), [self.train_input_size, self.train_input_size], np.copy(bboxes))
+        image, bboxes = image_resize_padding(np.copy(image), [self.train_input_size, self.train_input_size], np.copy(bboxes), is_rgb=True)
         return np.ndarray.astype(image, np.float32), np.ndarray.astype(bboxes, np.float32)
 
     def bbox_iou(self, boxes1, boxes2):
@@ -341,7 +341,7 @@ if __name__ == "__main__":
 
 
     # gtboxes_and_label_tensor = tf.reshape(gtboxes_and_label_batch, [-1, 5])
-    image_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch, sbboxes_batch, mbboxes_batch, lbboxes_batch = \
+    image_batch, filename_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch, sbboxes_batch, mbboxes_batch, lbboxes_batch = \
         dataset.dataset_tfrecord(shuffle=False)
     # gtboxes_in_img = show_box_in_tensor.draw_boxes_with_categories(img_batch=image_batch,
     #                                                                boxes=gtboxes_and_label_tensor[:, :-1],
@@ -359,14 +359,14 @@ if __name__ == "__main__":
         threads = tf.train.start_queue_runners(coord=coord)
         try:
             if not coord.should_stop():
-                image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = sess.run([image_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch,
+                image, filename, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = sess.run([image_batch, filename_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch,
                                                                          sbboxes_batch, mbboxes_batch, lbboxes_batch])
 
-                plt.imshow(image[0])
-                # print(filename[0])
+                print(filename[0])
                 print(sbboxes[0])
                 print(mbboxes[0])
                 print(lbboxes[0])
+                plt.imshow(image[0])
                 plt.show()
         except Exception as e:
             print(e)
@@ -376,3 +376,6 @@ if __name__ == "__main__":
         # waiting all threads safely exit
         coord.join(threads)
         sess.close()
+
+
+# [207.      208.41602 118.97601 385.216
