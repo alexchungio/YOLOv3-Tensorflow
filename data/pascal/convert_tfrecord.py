@@ -12,11 +12,12 @@
 
 import os
 import io
+import numpy as np
 import glob
 import random
 import tensorflow.compat.v1 as tf
 from lxml import etree
-import PIL.Image
+import PIL.Image as Image
 
 from libs.configs import cfgs
 from utils.tools import view_bar, read_class_names
@@ -47,6 +48,7 @@ tf.app.flags.DEFINE_string('img_format', 'jpg', 'format of image')
 tf.app.flags.DEFINE_boolean('ignore_difficult_instances', False, 'Whether to ignore '
                             'difficult instances')
 FLAGS = tf.app.flags.FLAGS
+
 
 
 # check route
@@ -119,9 +121,9 @@ def convert_pascal_to_tfrecord(dataset_path, save_path, record_capacity=2000, sh
         try:
             for img_file, xml_file in zip(sub_img_list, sub_xml_list):
 
-                encoded_img, shape, bboxes, labels, labels_text, difficult, truncated = process_image(img_file, xml_file, class_name=name_index)
+                image, shape, bboxes, labels, labels_text, difficult, truncated = process_image(img_file, xml_file, class_name=name_index)
 
-                image_record = serialize_example(img_file, encoded_img, labels, labels_text, bboxes, shape, difficult, truncated)
+                image_record = serialize_example(img_file, image, labels, labels_text, bboxes, shape, difficult, truncated)
                 write.write(record=image_record)
 
                 num_samples += 1
@@ -136,12 +138,18 @@ def convert_pascal_to_tfrecord(dataset_path, save_path, record_capacity=2000, sh
 def process_image(img_path, xml_path, class_name=None):
 
     # process image
-    with tf.gfile.GFile(img_path, 'rb') as fid:
-        encoded_img = fid.read()
-    encoded_img_io = io.BytesIO(encoded_img)
-    image = PIL.Image.open(encoded_img_io)
-    if image.format != 'JPEG':
-        raise ValueError('Image format not JPEG')
+    # with tf.gfile.GFile(img_path, 'rb') as fid:
+    #     encoded_img = fid.read()
+    # encoded_img_io = io.BytesIO(encoded_img)
+    # image = PIL.Image.open(encoded_img_io)
+    # if image.format != 'JPEG':
+    #     raise ValueError('Image format not JPEG')
+
+    image = Image.open(img_path)
+    # image.show("image_path")
+    # print(image.format, image.mode, image.size, image.info)
+    image = np.array(image)
+
 
     # process xml
     # with tf.gfile.GFile(xml_path, 'r') as fid:
@@ -162,7 +170,7 @@ def process_image(img_path, xml_path, class_name=None):
     truncated = []
     for obj in root.findall('object'):
         label = obj.find('name').text
-        labels.append(int(cfgs.VOC_LABELS[label][0]))
+        labels.append(int(class_name[label]))
         labels_text.append(label.encode('ascii'))
 
         if obj.find('difficult') is not None:
@@ -180,10 +188,10 @@ def process_image(img_path, xml_path, class_name=None):
                        float(bbox.find('xmax').text),
                        float(bbox.find('ymax').text)
                        ))
-    return encoded_img, shape, bboxes, labels, labels_text, difficult, truncated
+    return image, shape, bboxes, labels, labels_text, difficult, truncated
 
 
-def serialize_example(filename, image_data, labels, labels_text, bboxes, shape, difficult, truncated):
+def serialize_example(filename, image, labels, labels_text, bboxes, shape, difficult, truncated):
     """
     create a tf.Example message to be written to a file
     :param label: label info
@@ -218,7 +226,7 @@ def serialize_example(filename, image_data, labels, labels_text, bboxes, shape, 
             'image/object/bbox/label_text': _bytes_feature(labels_text),
             'image/object/bbox/difficult': _int64_feature(difficult),
             'image/object/bbox/truncated': _int64_feature(truncated),
-            'image/encoded': _bytes_feature(image_data),
+            'image/encoded': _bytes_feature(image.tostring()),
             'image/format': _bytes_feature(b'JPEG')}
     # create a feature message using tf.train.Example
     example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
