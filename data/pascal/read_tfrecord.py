@@ -46,8 +46,7 @@ class Dataset(object):
         self.anchor_per_scale = cfgs.ANCHOR_PER_SCALE
         self.max_bbox_per_scale = 150
         self.num_samples = self.get_num_samples()
-        # self.num_steps_per_epoches = int(np.ceil( self.get_num_samples()/ self.batch_size))
-        # self.batch_count = 0
+        self.num_steps_per_epoches = int(np.ceil( self.get_num_samples()/ self.batch_size))
 
     def read_parse_single_example(self, serialized_sample, is_training=False):
         """
@@ -170,7 +169,6 @@ class Dataset(object):
 
 
         return image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes
-
 
     def random_horizontal_flip(self, image, bboxes):
 
@@ -400,6 +398,3 @@ if __name__ == "__main__":
             coord.request_stop()
         # waiting all threads safely exit
         sess.close()
-
-
-# [207.      208.41602 118.97601 385.216
