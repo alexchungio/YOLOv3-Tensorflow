@@ -33,24 +33,26 @@ SHOW_TRAIN_INFO_INTE = 10
 SMRY_ITER = 100
 SAVE_WEIGHTS_INTE = 10000
 
-#----------------------data config------------------------------------
 DATASET_DIR = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_voc'
 
 ORG_WEIGHTS = ROOT_PATH + '/data/pretrained_weights/yolov3_coco.ckpt'
 PRETRAINED_WEIGHTS = ROOT_PATH + '/data/pretrained_weights/yolov3_coco_demo.ckpt'
-TRAINED_CKPT = os.path.join(ROOT_PATH,  'outputs', 'trained_weights', VERSION)
+TRAINED_CKPT = os.path.join(ROOT_PATH,  'outputs', 'trained_weights')
 EVALUATE_DIR = ROOT_PATH + '/outputs/evaluate_result'
-SUMMARY_PATH = os.path.join(ROOT_PATH, 'outputs', 'summary', VERSION)
+SUMMARY_PATH = os.path.join(ROOT_PATH, 'outputs', 'summary')
 
 INFERENCE_SAVE_PATH = ROOT_PATH + '/outputs/inference_results'
-TEST_SAVE_PATH = ROOT_PATH + '/outputs/test_results'
-INFERENCE_IMAGE_PATH = ROOT_PATH + '/outputs/inference_image'
+TEST_SAVE_IMAGE_PATH = ROOT_PATH + '/outputs/test_results/detect_images'
+TEST_SAVE_MAP_PATH = ROOT_PATH + '/outputs/test_results/detect_images/mAP'
+#----------------------data config------------------------------------
 
+NUM_READER = 4  # The number of parallel readers that read data from the dataset.
+NUM_THREADS = 4
 
 #---------------------- network config-----------------------------
 # IMAGE_SHPAE = [416, 416]
-
-CLASS_NAME             = ROOT_PATH + "/data/classes/coco.names"
+NUM_CLASSES         = 20
+CLASSES             = ROOT_PATH + "/data/classes/voc.names"
 ANCHORS                = ROOT_PATH + "/data/anchors/baseline_anchors.txt"
 MOVING_AVE_DECAY       = 0.9995
 STRIDES                = [8, 16, 32]
@@ -60,6 +62,7 @@ UPSAMPLE_METHOD        = "resize"
 
 
 # -------------------------Train options-------------------------------
+TRAIN_RECORD_DIR       = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_tfrecord_ssd/train'
 TRAIN_ANNOT_PATH       = ROOT_PATH + "/data/annotation/voc_train.txt"
 TRAIN_BATCH_SIZE       = 2
 TRAIN_INPUT_SIZE       = [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
@@ -71,7 +74,7 @@ FIRST_STAGE_EPOCHS      = 20
 SECOND_STAGE_EPOCHS     = 30
 
 # --------------------------Test options---------------------------------
-
+TEST_RECORD_DIR             = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_tfrecord_ssd/test'
 TEST_ANNOT_PATH             = ROOT_PATH + "/data/annotation/voc_test.txt"
 TEST_BATCH_SIZE             = 2
 TEST_INPUT_SIZE             = 544
@@ -85,26 +88,26 @@ TEST_IOU_THRESHOLD          = 0.45
 
 
 #-----------------------misc config------------------------------
+
 VOC_LABELS = {
-    'none': (0, 'Background'),
-    'aeroplane': (1, 'Vehicle'),
-    'bicycle': (2, 'Vehicle'),
-    'bird': (3, 'Animal'),
-    'boat': (4, 'Vehicle'),
-    'bottle': (5, 'Indoor'),
-    'bus': (6, 'Vehicle'),
-    'car': (7, 'Vehicle'),
-    'cat': (8, 'Animal'),
-    'chair': (9, 'Indoor'),
-    'cow': (10, 'Animal'),
-    'diningtable': (11, 'Indoor'),
-    'dog': (12, 'Animal'),
-    'horse': (13, 'Animal'),
-    'motorbike': (14, 'Vehicle'),
-    'person': (15, 'Person'),
-    'pottedplant': (16, 'Indoor'),
-    'sheep': (17, 'Animal'),
-    'sofa': (18, 'Indoor'),
-    'train': (19, 'Vehicle'),
-    'tvmonitor': (20, 'Indoor'),
+    'aeroplane': (0, 'Vehicle'),
+    'bicycle': (1, 'Vehicle'),
+    'bird': (2, 'Animal'),
+    'boat': (3, 'Vehicle'),
+    'bottle': (4, 'Indoor'),
+    'bus': (5, 'Vehicle'),
+    'car': (6, 'Vehicle'),
+    'cat': (7, 'Animal'),
+    'chair': (8, 'Indoor'),
+    'cow': (9, 'Animal'),
+    'diningtable': (10, 'Indoor'),
+    'dog': (11, 'Animal'),
+    'horse': (12, 'Animal'),
+    'motorbike': (13, 'Vehicle'),
+    'person': (14, 'Person'),
+    'pottedplant': (15, 'Indoor'),
+    'sheep': (16, 'Animal'),
+    'sofa': (17, 'Indoor'),
+    'train': (18, 'Vehicle'),
+    'tvmonitor': (18, 'Indoor'),
 }

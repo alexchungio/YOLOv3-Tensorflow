@@ -275,12 +275,14 @@ class Dataset(object):
 
 
 if __name__ == "__main__":
-
+    import matplotlib.pyplot as plt
     dataset = Dataset(is_training=True)
 
     for data in dataset:
         print(data[0].shape, data[1].shape, data[2].shape, data[3].shape, data[4].shape, data[5].shape, data[6].shape)
-        print(data[0])
+        plt.imshow(data[0][0])
+        plt.show()
+
 
 
 
