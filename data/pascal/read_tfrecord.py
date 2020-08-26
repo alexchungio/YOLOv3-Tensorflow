@@ -26,107 +26,102 @@ from data.preprocessing.yolo_preprocessing import image_resize_padding
 from libs.configs import cfgs
 
 # origin_dataset_dir = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_split/val'
-tfrecord_dir = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_tfrecord_ssd/train'
+# tfrecord_dir = '/media/alex/AC6A2BDB6A2BA0D6/alex_dataset/pascal_tfrecord_ssd/train'
 
 
 class Dataset(object):
 
-    def __init__(self, record_dir, is_training=False):
+    def __init__(self, is_training=False):
 
-        self.record_dir = record_dir
         self.is_training = is_training
+        self.record_dir = cfgs.TRAIN_RECORD_DIR if is_training else cfgs.TEST_RECORD_DIR
 
         self.input_sizes = cfgs.TRAIN_INPUT_SIZE if self.is_training else cfgs.TRAIN_INPUT_SIZE
         self.batch_size = cfgs.TRAIN_BATCH_SIZE if self.is_training else cfgs.TEST_BATCH_SIZE
 
-        self.train_input_sizes = cfgs.TRAIN_INPUT_SIZE
+        self.train_input_size = 416
         self.strides = np.array(cfgs.STRIDES)
         self.num_classes = cfgs.NUM_CLASSES
         self.anchors = np.array(tools.get_anchors(cfgs.ANCHORS))
         self.anchor_per_scale = cfgs.ANCHOR_PER_SCALE
         self.max_bbox_per_scale = 150
         self.num_samples = self.get_num_samples()
-        self.num_steps = int(np.ceil( self.get_num_samples()/ self.batch_size))
-        self.batch_count = 0
+        # self.num_steps_per_epoches = int(np.ceil( self.get_num_samples()/ self.batch_size))
+        # self.batch_count = 0
 
-
-    def dataset_tfrecord(self, batch_size=2, num_epochs=None, shuffle=True, num_threads=4, is_training=False):
+    def read_parse_single_example(self, serialized_sample, is_training=False):
         """
         parse tensor
         :param image_sample:
         :return:
         """
         # construct feature description
-        # Features in Pascal VOC TFRecords.
         keys_to_features = {
-            'image/filename': tf.FixedLenFeature((), tf.string, default_value=''),
-            'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
+            'image/filename': tf.FixedLenFeature([], tf.string, default_value=''),
+            'image/encoded': tf.FixedLenFeature([], tf.string, default_value=''),
             'image/format': tf.FixedLenFeature((), tf.string, default_value='jpeg'),
-            'image/height': tf.FixedLenFeature([1], tf.int64),
-            'image/width': tf.FixedLenFeature([1], tf.int64),
-            'image/channels': tf.FixedLenFeature([1], tf.int64),
+            'image/height': tf.FixedLenFeature([], tf.int64),
+            'image/width': tf.FixedLenFeature([], tf.int64),
+            'image/channels': tf.FixedLenFeature([], tf.int64),
             'image/shape': tf.FixedLenFeature([3], tf.int64),
-            'image/object/num_object': tf.FixedLenFeature([1], tf.int64),
+            'image/object/num_object': tf.FixedLenFeature([], tf.int64),
             'image/object/bbox/xmin': tf.VarLenFeature(dtype=tf.float32),
             'image/object/bbox/ymin': tf.VarLenFeature(dtype=tf.float32),
             'image/object/bbox/xmax': tf.VarLenFeature(dtype=tf.float32),
             'image/object/bbox/ymax': tf.VarLenFeature(dtype=tf.float32),
             'image/object/bbox/label': tf.VarLenFeature(dtype=tf.int64),
             'image/object/bbox/difficult': tf.VarLenFeature(dtype=tf.int64),
-            'image/object/bbox/truncated': tf.VarLenFeature(dtype=tf.int64),
+            'image/object/bbox/truncated': tf.VarLenFeature(dtype=tf.int64)
         }
+        features = tf.io.parse_single_example(serialized=serialized_sample, features=keys_to_features)
 
-        items_to_handlers = {
-            'image': slim.tfexample_decoder.Image('image/encoded', 'image/format'),
-            'filename': slim.tfexample_decoder.Tensor('image/filename'),
-            'shape': slim.tfexample_decoder.Tensor('image/shape'),
-            'object/num_object': slim.tfexample_decoder.Tensor('image/object/num_object'),
-            'object/bboxes': slim.tfexample_decoder.BoundingBox(
-                ['xmin', 'ymin', 'xmax', 'ymax',], 'image/object/bbox/'),
-            'object/label': slim.tfexample_decoder.Tensor('image/object/bbox/label'),
-            'object/difficult': slim.tfexample_decoder.Tensor('image/object/bbox/difficult'),
-            'object/truncated': slim.tfexample_decoder.Tensor('image/object/bbox/truncated'),
-        }
-        decoder = slim.tfexample_decoder.TFExampleDecoder(keys_to_features, items_to_handlers)
+        # parse feature
+        image_name = tf.cast(features['image/filename'], dtype=tf.string)
+        num_objects = tf.cast(features['image/object/num_object'], dtype=tf.int32)
 
-        labels_to_names = {}
-        for name, pair in cfgs.VOC_LABELS.items():
-            labels_to_names[pair[0]] = name
+        height = tf.cast(features['image/height'], dtype=tf.int32)
+        width = tf.cast(features['image/width'], dtype=tf.int32)
+        depth = tf.cast(features['image/channels'], dtype=tf.int32)
 
-        dataset = slim.dataset.Dataset(
-            data_sources=os.path.join(self.record_dir, '*'),
-            reader=tf.TFRecordReader,
-            decoder=decoder,
-            num_samples=self.num_samples,
-            items_to_descriptions=None,
-            num_classes=self.num_classes,
-            labels_to_names=labels_to_names)
+        # shape = tf.cast(feature['shape'], tf.int32)
 
-        with tf.name_scope('dataset_data_provider'):
-            provider = slim.dataset_data_provider.DatasetDataProvider(
-                dataset,
-                num_readers=cfgs.NUM_READER,
-                common_queue_capacity=32 * batch_size,
-                common_queue_min=8 * batch_size,
-                shuffle=shuffle,
-                num_epochs=num_epochs)
+        # actual data shape
+        image_shape = [height, width, depth]
+        bbox_shape = [num_objects, 1]
 
-        self.train_input_size = 416
+        image = tf.decode_raw(features['image/encoded'], out_type=tf.uint8)
+        image = tf.reshape(image, image_shape)
+
+        # parse gtbox
+        x_min = tf.sparse_tensor_to_dense(features['image/object/bbox/xmin'], default_value=0)
+        y_min = tf.sparse_tensor_to_dense(features['image/object/bbox/ymin'], default_value=0)
+        x_max = tf.sparse_tensor_to_dense(features['image/object/bbox/xmax'], default_value=0)
+        y_max = tf.sparse_tensor_to_dense(features['image/object/bbox/ymax'], default_value=0)
+        label = tf.sparse_tensor_to_dense(features['image/object/bbox/label'],default_value=0)
+
+        x_min = tf.reshape(x_min, bbox_shape)
+        y_min = tf.reshape(y_min, bbox_shape)
+        x_max = tf.reshape(x_max, bbox_shape)
+        y_max = tf.reshape(y_max, bbox_shape)
+        label = tf.reshape(label, bbox_shape)
+
+        # bboxes = tf.concat([x_min[:, tf.newaxis], y_min[:, tf.newaxis], x_max[:, tf.newaxis], y_max[:, tf.newaxis], tf.cast(label[:, tf.newaxis], dtype=tf.float32)], axis=-1)
+        bboxes = tf.concat([x_min, y_min, x_max, y_max, tf.cast(label, dtype=tf.float32)], axis=-1)
+        bboxes = tf.reshape(bboxes, shape=[-1, 5])
+
         self.train_output_sizes = self.train_input_size // self.strides
 
-        [image, filename, shape, bboxes, labels] = provider.get(['image', 'filename', 'shape', 'object/bboxes', 'object/label'])
-
-        bboxes = tf.concat([bboxes, tf.cast(labels[:, tf.newaxis], tf.float32)], axis=-1)
-        bboxes = tf.reshape(bboxes, (-1, 5))
-        image, bboxes = tf.py_func(self.image_processing, inp=[image, bboxes], Tout=[tf.float32, tf.float32])
-
+        image, bboxes = tf.numpy_function(self.image_processing, inp=[image, bboxes, is_training], Tout=[tf.float32, tf.float32])
         image = tf.reshape(image, shape=(self.train_input_size, self.train_input_size, 3))
         bboxes = tf.reshape(bboxes, shape=(-1, 5))
-        label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = tf.py_func(self.preprocess_true_boxes,
-                                                                                      inp=[bboxes],
-                                                                                      Tout=[tf.float32, tf.float32,
-                                                                                            tf.float32, tf.float32,
-                                                                                            tf.float32, tf.float32])
+        label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = tf.numpy_function(self.preprocess_true_boxes,
+                                                                                             inp=[bboxes],
+                                                                                             Tout=[tf.float32,
+                                                                                                   tf.float32,
+                                                                                                   tf.float32,
+                                                                                                   tf.float32,
+                                                                                                   tf.float32,
+                                                                                                   tf.float32])
 
         label_sbbox = tf.reshape(label_sbbox, shape=(self.train_output_sizes[0], self.train_output_sizes[0],
                                                      self.anchor_per_scale, 5 + self.num_classes))
@@ -139,12 +134,42 @@ class Dataset(object):
         lbboxes = tf.reshape(lbboxes, shape=(self.max_bbox_per_scale, 4))
 
 
-        return  tf.train.batch([image, filename, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes],
-                                 dynamic_pad=False,
-                                 batch_size=batch_size,
-                                 allow_smaller_final_batch=(not is_training),
-                                 num_threads=num_threads,
-                                 capacity=5 * batch_size)
+        return image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes
+
+
+    def dataset_tfrecord(self, batch_size=2, epoch=None, shuffle=False):
+        """
+        construct iterator to read image
+        :param record_file:
+        :return:
+        """
+        # comprise record file
+        record_list = [os.path.join(self.record_dir, filename) for filename in  os.listdir(self.record_dir)]
+        record_dataset = tf.data.TFRecordDataset(record_list)
+        # check record file format
+        # execute parse function to get dataset
+        # This transformation applies map_func to each element of this dataset,
+        # and returns a new dataset containing the transformed elements, in the
+        # same order as they appeared in the input.
+        # when parse_example has only one parameter (office recommend)
+        # parse_img_dataset = raw_img_dataset.map(parse_example)
+        # when parse_example has more than one parameter which used to process data
+        parse_img_dataset = record_dataset.map(lambda series_record:
+                                               self.read_parse_single_example(serialized_sample=series_record,
+                                                                              is_training=self.is_training))
+        # get dataset batch
+        if shuffle:
+            shuffle_batch_dataset = parse_img_dataset.shuffle(buffer_size=batch_size * 4).repeat(epoch).batch(
+                batch_size=batch_size)
+        else:
+            shuffle_batch_dataset = parse_img_dataset.repeat(epoch).batch(batch_size=batch_size)
+        # make dataset iterator
+        iterator = shuffle_batch_dataset.make_one_shot_iterator()
+        # get element
+        image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = iterator.get_next()
+
+
+        return image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes
 
 
     def random_horizontal_flip(self, image, bboxes):
@@ -202,8 +227,8 @@ class Dataset(object):
         return image, bboxes
 
 
-    def image_processing(self, image, bboxes):
-        if self.is_training:
+    def image_processing(self, image, bboxes, is_training=False):
+        if is_training:
             image, bboxes = self.random_horizontal_flip(np.copy(image), np.copy(bboxes))
             image, bboxes = self.random_crop(np.copy(image), np.copy(bboxes))
             image, bboxes = self.random_translate(np.copy(image), np.copy(bboxes))
@@ -323,29 +348,30 @@ class Dataset(object):
         :param record_file:
         :return:
         """
-
         # check record file format
-        record_list = glob.glob(os.path.join(self.record_dir, '*.record'))
-
+        # record_list = glob.glob(os.path.join(self.record_dir, '*.record'))
+        file_pattern = os.path.join(self.record_dir, '*.record')
+        input_files = tf.io.gfile.glob(file_pattern)
         num_samples = 0
-        for record_file in record_list:
-            for record in tf_record_iterator(record_file):
-                num_samples += 1
+        print("counting number of sample, please waiting...")
+        # convert to dynamic mode
+        tf.enable_eager_execution()
+        for _ in tf.data.TFRecordDataset(input_files):
+            num_samples += 1
+        # recover to static mode
+        tf.disable_eager_execution()
         return num_samples
 
 
 if __name__ == "__main__":
 
-
-    dataset = Dataset(tfrecord_dir, is_training=False)
-
+    dataset = Dataset(is_training=True)
 
     # gtboxes_and_label_tensor = tf.reshape(gtboxes_and_label_batch, [-1, 5])
-    image_batch, filename_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch, sbboxes_batch, mbboxes_batch, lbboxes_batch = \
-        dataset.dataset_tfrecord(shuffle=False)
-    # gtboxes_in_img = show_box_in_tensor.draw_boxes_with_categories(img_batch=image_batch,
-    #                                                                boxes=gtboxes_and_label_tensor[:, :-1],
-    #                                                                labels=gtboxes_and_label_tensor[:, -1])
+    image_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch, sbboxes_batch, mbboxes_batch, lbboxes_batch = \
+        dataset.dataset_tfrecord(batch_size=2, shuffle=True)
+
+
     init_op = tf.group(
         tf.global_variables_initializer(),
         tf.local_variables_initializer()
@@ -354,27 +380,25 @@ if __name__ == "__main__":
         sess.run(init_op)
         # create Coordinator to manage the life period of multiple thread
         coord = tf.train.Coordinator()
+
         # Starts all queue runners collected in the graph to execute input queue operation
         # the step contain two operation:filename to filename queue and sample to sample queue
-        threads = tf.train.start_queue_runners(coord=coord)
         try:
             if not coord.should_stop():
-                image, filename, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = sess.run([image_batch, filename_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch,
-                                                                         sbboxes_batch, mbboxes_batch, lbboxes_batch])
+                for _ in range(10):
+                    image, label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes = sess.run([image_batch, label_sbbox_batch, label_mbbox_batch, label_lbbox_batch,
+                                                                             sbboxes_batch, mbboxes_batch, lbboxes_batch])
+                    #
+                    print(image.shape, label_sbbox.shape, label_mbbox.shape, label_lbbox.shape)
 
-                print(filename[0])
-                print(sbboxes[0])
-                print(mbboxes[0])
-                print(lbboxes[0])
-                plt.imshow(image[0])
-                plt.show()
+                    plt.imshow(image[0])
+                    plt.show()
         except Exception as e:
             print(e)
         finally:
             # request to stop all background threads
             coord.request_stop()
         # waiting all threads safely exit
-        coord.join(threads)
         sess.close()
 
 
