@@ -24,7 +24,7 @@ class YOLOV3(object):
     def __init__(self, input_data, trainable):
 
         self.trainable        = trainable
-        self.classes          = tools.read_class_names(cfgs.CLASS_NAME)
+        self.classes          = tools.read_class_names(cfgs.CLASSES)
         self.num_class        = len(self.classes)
         self.num_class        = len(self.classes)
         self.strides          = np.array(cfgs.STRIDES)
@@ -101,6 +101,7 @@ class YOLOV3(object):
 
     def decode(self, conv_output, anchors, stride):
         """
+        reference paper Bounding Box Prediction part
         # couv_output [batch_size, output_size, output_size, (anchor_per_scale * 5 + num_classes)]
         return tensor of shape [batch_size, output_size, output_size, anchor_per_scale, 5 + num_classes]
                contains (x, y, w, h, score, probability)
@@ -129,6 +130,11 @@ class YOLOV3(object):
         xy_grid = tf.tile(xy_grid[tf.newaxis, :, :, tf.newaxis, :], [batch_size, 1, 1, anchor_per_scale, 1]) # (batch_size, output_size, output_size, 3, 2)
         xy_grid = tf.cast(xy_grid, tf.float32)
 
+        #+++++++++++++++++++++++reference YOLOv3 paper Bounding Box Prediction part++++++++++++++++++++++++++++++++
+        # conv_raw_dxdy => t_x, t_y
+        # conv_raw_dwdh => t_w, t_h
+        # xy_grid => c_x, x_y
+        # anchor =>  p_w, p_h
         pred_xy = (tf.sigmoid(conv_raw_dxdy) + xy_grid) * stride
         pred_wh = (tf.exp(conv_raw_dwdh) * anchors) * stride
         pred_xywh = tf.concat([pred_xy, pred_wh], axis=-1)
