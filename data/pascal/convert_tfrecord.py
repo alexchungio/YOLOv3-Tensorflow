@@ -150,7 +150,6 @@ def process_image(img_path, xml_path, class_name=None):
     # print(image.format, image.mode, image.size, image.info)
     image = np.array(image)
 
-
     # process xml
     # with tf.gfile.GFile(xml_path, 'r') as fid:
     #     xml_str = fid.read()

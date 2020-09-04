@@ -26,12 +26,12 @@ from utils.tools import makedir, view_bar
 
 
 class ObjectInference():
-    def __init__(self, input_size=(416, 416), ckpt_path=None, score_threshold=0.3, num_threshold=0.45):
+    def __init__(self, input_size=(416, 416), ckpt_path=None, score_threshold=0.4, num_threshold=0.45):
         self.input_size    = input_size
         self.ckpt_path    = ckpt_path
         self.score_threshold = score_threshold
         self.num_threshold = num_threshold
-        self.class_name   = read_class_names(cfgs.CLASS_NAME)
+        self.class_name   = read_class_names(cfgs.CLASSES)
         self.num_classes  = len(self.class_name)
         self.input_data = tf.placeholder(dtype=tf.float32, name='input_data')
         self.trainable = tf.placeholder(dtype=tf.bool, name="training")

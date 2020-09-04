@@ -19,6 +19,11 @@ $ wget http://images.cocodataset.org/zips/val2017.zip
 ### pretrained weights
 * <https://pan.baidu.com/s/11mwiUy8KotjUVQXqkGGPFQ&shfl=sharepset#list/path=%2F>
 
+## train logs
+|![“yolo_v3 pascal voc train logs”](docs/yolov3_voc_train_logs.png) |
+|:-------:|
+|voc_train_logs|
+
 ## reference
 * https://github.com/YunYang1994/tensorflow-yolov3
 * https://github.com/wizyoung/YOLOv3_TensorFlow
